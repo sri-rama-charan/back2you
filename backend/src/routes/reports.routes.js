@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const ItemReport = require('../models/ItemReport');
-// auth middleware (simple) can be created later
+const auth = require('../middlewares/auth.middleware'); // Import the middleware
 
-// create report
-router.post('/', async (req, res) => {
+// POST /api/reports - Protected Route
+router.post('/', auth, async (req, res) => {
   try {
-    const data = req.body;
-    // in real app: validate, attach req.user.id as reportedBy
-    const report = await ItemReport.create(data);
+    // Now we can trust req.user.id exists because 'auth' middleware passed
+    const newReport = {
+      ...req.body,
+      reportedBy: req.user.id // Link the report to the logged-in user
+    };
+    
+    const report = await ItemReport.create(newReport);
     res.status(201).json(report);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -44,5 +48,19 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
+
+// Get reports for the logged-in user
+router.get('/my-reports', auth, async (req, res) => {
+  try {
+    const reports = await ItemReport.find({ reportedBy: req.user.id }).sort({ createdAt: -1 });
+    res.json(reports);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 
 module.exports = router;

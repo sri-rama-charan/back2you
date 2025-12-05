@@ -28,11 +28,12 @@ export default function Navbar(){
               <Link to="/register" className="text-sm px-3 py-1 rounded border">Register</Link>
             </>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-700">Hi, {user?.name || 'User'}</div>
-              <button onClick={handleLogout} className="text-sm px-3 py-1 rounded bg-gray-200">Logout</button>
-            </div>
-          )}
+              <div className="flex items-center gap-2">
+                <Link to="/my-reports" className="text-sm hover:underline font-medium text-indigo-600">My Reports</Link>    
+                <div className="text-sm text-gray-700 ml-2">Hi, {user?.name || 'User'}</div>
+                <button onClick={handleLogout} className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">Logout</button>
+              </div>
+            )}
         </div>
       </div>
     </nav>
