@@ -3,19 +3,51 @@ const router = express.Router();
 const ItemReport = require('../models/ItemReport');
 const auth = require('../middlewares/auth.middleware'); // Import the middleware
 
+const multer = require('multer');
+const cloudinary = require('../utils/cloudinary');
+const upload = multer({ dest: 'uploads/' }); // Temp folder for uploads
+const fs = require('fs'); // To remove temp files after upload
+
 // POST /api/reports - Protected Route
-router.post('/', auth, async (req, res) => {
+// 'image' is the name of the field in the form data
+router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
-    // Now we can trust req.user.id exists because 'auth' middleware passed
+    let imageUrl = '';
+
+    // 1. If a file was uploaded, send it to Cloudinary
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "back2you", // optional folder name in cloudinary
+      });
+      imageUrl = result.secure_url;
+
+      // Clean up local temp file
+      fs.unlinkSync(req.file.path);
+    }
+
+    // 2. Create the report
     const newReport = {
       ...req.body,
-      reportedBy: req.user.id // Link the report to the logged-in user
+      images: imageUrl ? [imageUrl] : [], // Store as array since your model expects array
+      reportedBy: req.user.id
     };
-    
+
     const report = await ItemReport.create(newReport);
     res.status(201).json(report);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get reports for the logged-in user
+router.get('/my-reports', auth, async (req, res) => {
+  try {
+    const reports = await ItemReport.find({ reportedBy: req.user.id }).sort({ createdAt: -1 });
+    res.json(reports);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -50,13 +82,21 @@ router.get('/:id', async (req, res) => {
 });
 
 
-
-// Get reports for the logged-in user
-router.get('/my-reports', auth, async (req, res) => {
+// DELETE /api/reports/:id
+router.delete('/:id', auth, async (req, res) => {
   try {
-    const reports = await ItemReport.find({ reportedBy: req.user.id }).sort({ createdAt: -1 });
-    res.json(reports);
+    const report = await ItemReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+
+    // Security Check: Ensure the logged-in user owns this report
+    if (report.reportedBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized to delete this report' });
+    }
+
+    await report.deleteOne();
+    res.json({ message: 'Report deleted successfully' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
